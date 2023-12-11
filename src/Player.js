@@ -1,41 +1,80 @@
-import { useFrame } from "@react-three/fiber"
 import { RigidBody, useRapier } from "@react-three/rapier"
+import { useFrame } from "@react-three/fiber"
 import { useKeyboardControls } from "@react-three/drei"
 import { useRef, useEffect, useState } from 'react'
 import * as THREE from 'three'
+import useGame from "./stores/useGame"
 
 export default function Player() {
     const body = useRef()
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { rapier, world } = useRapier()
-    const [smoothCameraPosition] = useState(() => new THREE.Vector3())
-    const [smoothCameraTarget] = useState(() => new THREE.Vector3())
+    const [smoothedCameraPosition] = useState(() => new THREE.Vector3(20, 20, 20))
+    const [smoothedCameraTarget] = useState(() => new THREE.Vector3())
+    const { phase, start, end, restart, blocksCount } = useGame()
 
     const jump = () => {
         const origin = body.current.translation()
         origin.y -= 0.31
-        const direction = { x: 0, y: -1, z: 0 }
+        const direction = { x: 0, y: - 1, z: 0 }
         const ray = new rapier.Ray(origin, direction)
         const hit = world.castRay(ray, 10, true)
 
-        if (hit.toi < .15)
-            body.current.applyImpulse({ x: 0, y: .5, z: 0 })
+        if (hit.toi < 0.15) {
+            body.current.applyImpulse({ x: 0, y: 0.5, z: 0 })
+        }
+    }
+
+    const reset = () => {
+        console.log('RESET')
+        body.current.setTranslation({ x: 0, y: 1, z: 0 })
+        body.current.setLinvel({ x: 0, y: 0, z: 0 })
+        body.current.setAngvel({ x: 0, y: 0, z: 0 })
     }
 
     useEffect(() => {
-        const unsubscribeJump = subscribeKeys(
-            (state) => state.jump,
+        const unsubscribePhase = useGame.subscribe(
+            (state) => state.phase,
             (value) => {
-                if (value) {
-                    jump()
+                if (value === 'ready') {
+                    // Do NOT change the level here. This should only log the phase change.
+                    console.log('Phase is now ready');
                 }
+            }
+        );
+
+        const unsubscribeReset = useGame.subscribe(
+            (state) => state.phase,
+            (value) => {
+                if (value === ('ready' || 'playing'))
+                    reset()
             }
         )
 
+        const unsubscribeJump = subscribeKeys(
+            (state) => state.jump,
+            (value) => {
+                if (value)
+                    jump()
+            }
+        )
+
+        const unsubscribeAny = subscribeKeys(() => {
+            // Get the current phase directly from the store
+            const currentPhase = useGame.getState().phase;
+            if (currentPhase === 'ready') {
+                start();
+            }
+        });
+
         return () => {
+            unsubscribePhase()
+            unsubscribeReset()
             unsubscribeJump()
+            unsubscribeAny()
         }
     }, [])
+
 
     useFrame((state, delta) => {
         const { forward, backward, leftward, rightward } = getKeys()
@@ -77,11 +116,20 @@ export default function Player() {
         cameraTarget.copy(bodyPosition)
         cameraTarget.y += 0.25
 
-        smoothCameraPosition.lerp(cameraPosition, 5 * delta)
-        smoothCameraTarget.lerp(cameraTarget, 5 * delta)
+        smoothedCameraPosition.lerp(cameraPosition, 5 * delta)
+        smoothedCameraTarget.lerp(cameraTarget, 5 * delta)
 
-        state.camera.position.copy(smoothCameraPosition)
-        state.camera.lookAt(smoothCameraTarget)
+        state.camera.position.copy(smoothedCameraPosition)
+        state.camera.lookAt(smoothedCameraTarget)
+
+        /**
+        * Phases
+        */
+        if (bodyPosition.z < - (blocksCount * 4 + 2))
+            useGame.getState().end()
+
+        if (bodyPosition.y < - 4)
+            useGame.getState().restart()
     })
 
     return <RigidBody ref={body} colliders="ball"
