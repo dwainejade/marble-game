@@ -46,6 +46,19 @@ body,
   cursor: pointer;
 }
 
+.instructions {
+  display: flex;
+  justify-content: center;
+  position: absolute;
+  top: 40%;
+  left: 0;
+  width: 100%;
+  color: #ffffff;
+  font-size: 80px;
+  background: #00000033;
+  padding-top: 10px;
+}
+
 .controls {
   position: absolute;
   bottom: 10%;
@@ -72,4 +85,42 @@ body,
 
 .controls .key.active {
   background: #ffffff99;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 1s ease-out;
+}
+.fade-out {
+  animation: fadeOut 1s ease-out;
+}
+
+.zoom-in {
+  animation: zoomIn 0.5s ease-out;
 }
